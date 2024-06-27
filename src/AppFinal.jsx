@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs/bundled/rough.esm";
+import getStroke from "perfect-freehand";
 
 const generator = rough.generator();
 
@@ -144,6 +145,7 @@ const useHistory = initialState => {
 };
 
 const getSvgPathFromStroke = stroke => {
+
   if (!stroke.length) return "";
 
   const d = stroke.reduce(
@@ -208,7 +210,7 @@ const usePressedKeys = () => {
   return pressedKeys;
 };
 
-const App = () => {
+const AppFinal = () => {
   const [elements, setElements, undo, redo] = useHistory([]);
   const [action, setAction] = useState("none");
   const [tool, setTool] = useState("rectangle");
@@ -504,4 +506,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default AppFinal;

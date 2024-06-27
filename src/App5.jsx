@@ -1,17 +1,29 @@
-// 5 - FREEHAND
+// 4 - UNDO REDO
 
 import rough from 'roughjs/bundled/rough.esm';
 import { useState, useLayoutEffect, useEffect } from 'react';
+
+import { getSvgPathFromStroke } from './utils';
+
+import getStroke from 'perfect-freehand';
 
 const generator = rough.generator();
 
 function createElement(id, x1, y1, x2, y2, type){
 
-  const roughElement = type === "line" ? 
-    generator.line(x1, y1, x2, y2):
-    generator.rectangle(x1, y1, x2-x1, y2-y1)
-
-  return { id, x1, y1, x2, y2, type, roughElement}
+  switch (type) {
+    case "line":
+    case "rectangle":
+      const roughElement =  type === "line"
+        ? generator.line(x1, y1, x2, y2, {roughness: 0.5, strokeWidth: 4})
+        : generator.rectangle(x1, y1, x2-x1, y2-y1, {roughness: 0.5, strokeWidth: 4})
+      return { id, x1, y1, x2, y2, type, roughElement}
+    case "pencil":
+      // todo
+      return {id, type, points: [{x: x1, y: y1}]};
+    default:
+      throw new Error("Type not recognised: " + type);
+  }
 }
 
 const nearPosition = (x, y, x1, y1, name) => {
@@ -140,11 +152,32 @@ const useHistory = (initialState) => {
     return [history[index], setState, undo, redo];
 }
 
-function App5() {
+const drawElement = (roughCanvas, context, element) => {
 
-const [elements, setElements, undo, redo] = useHistory([]);
+  switch (element.type) {
+    case "line":
+    case "rectangle":
+      roughCanvas.draw(element.roughElement);
+      break;
+    case "pencil":
+      const stroke = getSvgPathFromStroke(getStroke(element.points, {
+        size: 10
+      }));
+      context.fill(new Path2D(stroke));
+      break;
+    default:
+      throw new Error("Type not recognised: " + element.type);
+  }
+
+}
+
+const ajustmentRequired = type => ["line", "rectangle"].includes(type);
+
+function App4() {
+
+  const [elements, setElements, undo, redo] = useHistory([]);
   const [action, setAction] = useState("none");
-  const [tool, setTool] = useState("line");
+  const [tool, setTool] = useState("pencil");
   const [selectedElement, setSelectedElement] = useState(null);
 
   useLayoutEffect(() => {
@@ -154,7 +187,7 @@ const [elements, setElements, undo, redo] = useHistory([]);
 
     const roughCanvas = rough.canvas(canvas);
     
-    elements.forEach(({ roughElement }) => roughCanvas.draw(roughElement));
+    elements.forEach(element => drawElement(roughCanvas, context, element));
 
   }, [elements]);
 
@@ -180,10 +213,21 @@ const [elements, setElements, undo, redo] = useHistory([]);
   const updateElement = (id, x1, y1, x2, y2, type) => {
     // esta função cria um elemento novo nas posições informadas e substitui ele pelo elemento que 
     // se deseja atualizar
-    const updatedElement = createElement(id, x1, y1, x2, y2, type);
-  
+
     const elementsCopy = [...elements];
-    elementsCopy[id] = updatedElement;
+    
+    switch(type){
+      case "line":
+      case "rectangle":
+        elementsCopy[id] = createElement(id, x1, y1, x2, y2, type);
+        break;
+      case "pencil":
+        elementsCopy[id].points = [...elementsCopy[id].points, {x: x2, y: y2}];
+        break;
+      default:
+        throw new Error ("Type not recognized: " + type);
+    }
+
     setElements(elementsCopy, true);
   }
 
@@ -259,7 +303,7 @@ const [elements, setElements, undo, redo] = useHistory([]);
         const index = selectedElement.id;
         const {id, type} = elements[index];
     
-        if(action === "drawing" || action === "resizing"){
+        if((action === "drawing" || action === "resizing") && ajustmentRequired(type)){
           const {x1, y1, x2, y2} = adjustElementCoordinates(elements[index]);
           updateElement(id, x1, y1, x2, y2, type);
         }
@@ -278,7 +322,9 @@ const [elements, setElements, undo, redo] = useHistory([]);
       a.href = URL.createObjectURL(blob);
       a.click();
       a.remove();
-    })
+    });
+
+    console.log(elements);
   }
 
   return (
@@ -304,7 +350,14 @@ const [elements, setElements, undo, redo] = useHistory([]);
           checked={tool === "rectangle"}
           onChange={() => setTool("rectangle")}
         />
-        <label htmlFor="rectangle">Rectangle</label>
+        <label htmlFor="rectangle">Rectangle</label> 
+        <input 
+          type="radio" 
+          id="pencil"
+          checked={tool === "pencil"}
+          onChange={() => setTool("pencil")}
+        />
+        <label htmlFor="pencil">Pencil</label>
         <button onClick={(e) => saveCanvas(e)}>
           Save
         </button>
@@ -328,4 +381,4 @@ const [elements, setElements, undo, redo] = useHistory([]);
   )
 }
 
-export default App5;
+export default App4;
